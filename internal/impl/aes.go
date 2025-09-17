@@ -39,13 +39,27 @@
 package impl
 
 import (
+	"encoding/binary"
 	"simd"
 )
 
-func decompose(in simd.Uint64x2) (uint64, uint64) {
-	var out [2]uint64
-	in.Store(&out)
-	return out[0], out[1]
+func decompose(in simd.Uint8x16) (uint32, uint32, uint32, uint32) {
+	var b [16]byte
+	in.Store(&b)
+
+	return binary.BigEndian.Uint32(b[0:4]),
+		binary.BigEndian.Uint32(b[4:8]),
+		binary.BigEndian.Uint32(b[8:12]),
+		binary.BigEndian.Uint32(b[12:16])
+}
+
+func compose(a, b, c, d uint32) simd.Uint8x16 {
+	var buf [16]byte
+	binary.BigEndian.PutUint32(buf[0:4], a)
+	binary.BigEndian.PutUint32(buf[4:8], b)
+	binary.BigEndian.PutUint32(buf[8:12], c)
+	binary.BigEndian.PutUint32(buf[12:16], d)
+	return simd.LoadUint8x16(&buf)
 }
 
 // aesRoundGeneric performs a single AES round.
@@ -54,31 +68,17 @@ func decompose(in simd.Uint64x2) (uint64, uint64) {
 // MixColums, and AddRoundKey.
 //
 // aesRoundGeneric is borrowed from crypto/aes.encryptBlockGo.
-func aesRoundGeneric(in simd.Uint64x2, rk simd.Uint64x2) simd.Uint64x2 {
-	// TODO(sjy): this is probably not the right order.
-	inlo, inhi := decompose(in)
-	rklo, rkhi := decompose(rk)
+func AesRoundGeneric(in simd.Uint8x16, rk simd.Uint8x16) simd.Uint8x16 {
+	s0, s1, s2, s3 := decompose(in)
 
-	s0 := uint32(inlo >> 32)
-	s1 := uint32(inhi)
-	s2 := uint32(inlo >> 32)
-	s3 := uint32(inlo)
-
-	xk0 := uint32(rkhi >> 32)
-	xk1 := uint32(rkhi)
-	xk2 := uint32(rklo >> 32)
-	xk3 := uint32(rklo)
+	xk0, xk1, xk2, xk3 := decompose(rk)
 
 	t0 := xk0 ^ te0[uint8(s0>>24)] ^ te1[uint8(s1>>16)] ^ te2[uint8(s2>>8)] ^ te3[uint8(s3)]
 	t1 := xk1 ^ te0[uint8(s1>>24)] ^ te1[uint8(s2>>16)] ^ te2[uint8(s3>>8)] ^ te3[uint8(s0)]
 	t2 := xk2 ^ te0[uint8(s2>>24)] ^ te1[uint8(s3>>16)] ^ te2[uint8(s0>>8)] ^ te3[uint8(s1)]
 	t3 := xk3 ^ te0[uint8(s3>>24)] ^ te1[uint8(s0>>16)] ^ te2[uint8(s1>>8)] ^ te3[uint8(s2)]
 
-	// TODO(sjy): this is probably not the right order.
-	out := [4]uint32{
-		t0, t1, t2, t3,
-	}
-	return simd.LoadUint32x4(&out).AsUint64x2()
+	return compose(t0, t1, t2, t3)
 }
 
 var te0 = [256]uint32{

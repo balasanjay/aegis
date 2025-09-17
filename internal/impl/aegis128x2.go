@@ -9,19 +9,17 @@ type State128x2 struct {
 }
 
 func InitState128x2(key simd.Uint8x16, nonce simd.Uint8x16) State128x2 {
-	c0 := [2]uint64{0x000101020305080d, 0x1522375990e97962}
-	c1 := [2]uint64{0xdb3d18556dc22ff1, 0x2011314273b528dd}
-	C0 := simd.LoadUint64x2(&c0).AsUint8x16()
-	C1 := simd.LoadUint64x2(&c1).AsUint8x16()
+	C0 := simd.LoadUint8x16(&[16]byte{0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x08, 0x0d, 0x15, 0x22, 0x37, 0x59, 0x90, 0xe9, 0x79, 0x62})
+	C1 := simd.LoadUint8x16(&[16]byte{0xdb, 0x3d, 0x18, 0x55, 0x6d, 0xc2, 0x2f, 0xf1, 0x20, 0x11, 0x31, 0x42, 0x73, 0xb5, 0x28, 0xdd})
 
 	S0 := key.Xor(nonce)
 	S1 := C1
 	S2 := C0
 	S3 := C1
-	S4 := key.Xor(nonce)
+	S4 := S0
 	S5 := key.Xor(C0)
 	S6 := key.Xor(C1)
-	S7 := key.Xor(C0)
+	S7 := S5
 
 	ctx := [32]byte{
 		0:  0x00,
@@ -47,7 +45,7 @@ func InitState128x2(key simd.Uint8x16, nonce simd.Uint8x16) State128x2 {
 	for range 10 {
 		state.V3 = state.V3.Xor(Ctx)
 		state.V7 = state.V7.Xor(Ctx)
-		state = UpdateState128x2(state, Key, Nonce)
+		state = UpdateState128x2(state, Nonce, Key)
 	}
 
 	return state
@@ -114,8 +112,35 @@ func DecPartial128x2(state State128x2, c [64]byte, clen int) (State128x2, [64]by
 }
 
 func Finalize128x2(state State128x2, adlen, msglen uint64, tagout []byte) {
-	// TODO(sjy): implement Finalize.
-	panic("implement")
+	{
+		t0 := simd.LoadUint64x2(&[2]uint64{adlen, msglen}).AsUint8x16()
+		t1 := simd.Uint8x32{}.SetLo(t0).SetHi(t0).Xor(state.V2)
+
+		for range 7 {
+			state = UpdateState128x2(state, t1, t1)
+		}
+	}
+
+	if len(tagout) == 16 {
+		v01 := state.V0.Xor(state.V1)
+		v23 := state.V2.Xor(state.V3)
+		v45 := state.V4.Xor(state.V5)
+		v06 := v01.Xor(v23).Xor(v45).Xor(state.V6)
+		v06.GetLo().Xor(v06.GetHi()).StoreSlice(tagout)
+	} else if len(tagout) == 32 {
+		v01 := state.V0.Xor(state.V1)
+		v23 := state.V2.Xor(state.V3)
+		v45 := state.V4.Xor(state.V5)
+		v67 := state.V6.Xor(state.V7)
+
+		v03 := v01.Xor(v23)
+		v03.GetLo().Xor(v03.GetHi()).StoreSlice(tagout[0:16])
+
+		v47 := v45.Xor(v67)
+		v47.GetLo().Xor(v47.GetHi()).StoreSlice(tagout[16:32])
+	} else {
+		panic("tagout must be 16 or 32 bytes")
+	}
 }
 
 func AESx2(M0 simd.Uint8x32, M1 simd.Uint8x32) simd.Uint8x32 {
@@ -123,11 +148,11 @@ func AESx2(M0 simd.Uint8x32, M1 simd.Uint8x32) simd.Uint8x32 {
 
 	m00 := M0.GetLo()
 	m10 := M1.GetLo()
-	result0 := aesRoundGeneric(m00.AsUint64x2(), m10.AsUint64x2())
+	result0 := AesRoundGeneric(m00, m10)
 
 	m01 := M0.GetHi()
 	m11 := M1.GetHi()
-	result1 := aesRoundGeneric(m01.AsUint64x2(), m11.AsUint64x2())
+	result1 := AesRoundGeneric(m01, m11)
 
-	return simd.Uint8x32{}.SetLo(result0.AsUint8x16()).SetHi(result1.AsUint8x16())
+	return simd.Uint8x32{}.SetLo(result0).SetHi(result1)
 }
