@@ -62,6 +62,7 @@ func unhex(h string) []byte {
 	return b
 }
 
+//go:noinline
 func hexSIMD(a simd.Uint8x16) string {
 	var b [16]byte
 	a.StoreSlice(b[:])
