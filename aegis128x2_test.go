@@ -1,11 +1,11 @@
 package aegis_test
 
 import (
+	"encoding/hex"
 	_ "github.com/balasanjay/aegis"
 	"github.com/balasanjay/aegis/internal/impl"
-	"testing"
-	"encoding/hex"
 	"simd"
+	"testing"
 )
 
 func TestAegis128x2(t *testing.T) {
@@ -37,6 +37,16 @@ func TestAegis128x2(t *testing.T) {
 
 	t.Logf("V7.L = %s", hexSIMD(state.V7.GetLo()))
 	t.Logf("V7.H = %s", hexSIMD(state.V7.GetHi()))
+}
+
+func TestAegis128x2NoSpill(t *testing.T) {
+	key := unhex("000102030405060708090a0b0c0d0e0f")
+	nonce := unhex("101112131415161718191a1b1c1d1e1f")
+
+	state := impl.InitState128x2(simd.LoadUint8x16Slice(key), simd.LoadUint8x16Slice(nonce))
+
+	t.Logf("V0.L = %s", hexSIMD(state.V0.GetLo()))
+	t.Logf("V0.H = %s", hexSIMD(state.V0.GetHi()))
 }
 
 func unhexSIMD(h string) simd.Uint8x16 {
