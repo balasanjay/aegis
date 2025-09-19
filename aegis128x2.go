@@ -29,14 +29,14 @@ func (a AEAD128x2) Seal(dst, nonce, plaintext, aad []byte) []byte {
 	ret, tag := sliceForAppend(dst, len(plaintext)+a.Overhead())
 
 	var tagb [16]byte
-	ret, tagb = a.DetachedSeal(ret, nonce, plaintext, aad)
+	ret, tagb = a.DetachedSeal16(ret, nonce, plaintext, aad)
 
 	copy(tag[:], tagb[:])
 
 	return ret
 }
 
-func (a AEAD128x2) DetachedSeal(dst, nonce, plaintext, aad []byte) ([]byte, [16]byte) {
+func (a AEAD128x2) DetachedSeal16(dst, nonce, plaintext, aad []byte) ([]byte, [16]byte) {
 	if len(nonce) != a.NonceSize() {
 		panic("nonce is incorrect size")
 	}

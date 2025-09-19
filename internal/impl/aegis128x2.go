@@ -113,7 +113,7 @@ func DecPartial128x2(state State128x2, c [64]byte, clen int) (State128x2, [64]by
 
 func Finalize128x2(state State128x2, adlen, msglen uint64, tagout []byte) {
 	{
-		t0 := simd.LoadUint64x2(&[2]uint64{adlen, msglen}).AsUint8x16()
+		t0 := simd.LoadUint64x2(&[2]uint64{8 * adlen, 8 * msglen}).AsUint8x16()
 		t1 := simd.Uint8x32{}.SetLo(t0).SetHi(t0).Xor(state.V2)
 
 		for range 7 {
@@ -125,7 +125,9 @@ func Finalize128x2(state State128x2, adlen, msglen uint64, tagout []byte) {
 		v01 := state.V0.Xor(state.V1)
 		v23 := state.V2.Xor(state.V3)
 		v45 := state.V4.Xor(state.V5)
-		v06 := v01.Xor(v23).Xor(v45).Xor(state.V6)
+		v03 := v01.Xor(v23)
+		v456 := v45.Xor(state.V6)
+		v06 := v03.Xor(v456)
 		v06.GetLo().Xor(v06.GetHi()).StoreSlice(tagout)
 	} else if len(tagout) == 32 {
 		v01 := state.V0.Xor(state.V1)
