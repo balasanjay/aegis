@@ -156,6 +156,81 @@ func Finalize128x2_32(state State128x2, adlen, msglen uint64) [32]byte {
 	return ret
 }
 
+func Finalize128x2Mac_16(state State128x2, dlen uint64) [16]byte {
+	state = finalize128x2Common(state, dlen, 16)
+
+	v01 := state.V0.Xor(state.V1)
+	v23 := state.V2.Xor(state.V3)
+	v45 := state.V4.Xor(state.V5)
+	v03 := v01.Xor(v23)
+	v456 := v45.Xor(state.V6)
+	v06 := v03.Xor(v456)
+
+	x0 := simd.Uint8x32{}.SetLo(v06.GetLo())
+	x1 := simd.Uint8x32{}.SetLo(v06.GetHi())
+	state = UpdateState128x2(state, x0, x1)
+
+	u := simd.LoadUint64x2(&[2]uint64{2, 8 * 16}).AsUint8x16()
+	t := simd.Uint8x32{}.SetLo(state.V2.GetLo().Xor(u))
+
+	for range 7 {
+		state = UpdateState128x2(state, t, t)
+	}
+
+	t01 := state.V0.GetLo().Xor(state.V1.GetLo())
+	t23 := state.V2.GetLo().Xor(state.V3.GetLo())
+	t45 := state.V4.GetLo().Xor(state.V5.GetLo())
+	t03 := t01.Xor(t23)
+	t456 := t45.Xor(state.V6.GetLo())
+	t06 := t03.Xor(t456)
+
+	var ret [16]byte
+	t06.Store(&ret)
+
+	return ret
+}
+
+func Finalize128x2Mac_32(state State128x2, dlen uint64) [32]byte {
+	state = finalize128x2Common(state, dlen, 32)
+
+	{
+
+		v01 := state.V0.GetHi().Xor(state.V1.GetHi())
+		v23 := state.V2.GetHi().Xor(state.V3.GetHi())
+		v03 := v01.Xor(v23)
+
+		v45 := state.V4.GetHi().Xor(state.V5.GetHi())
+		v67 := state.V6.GetHi().Xor(state.V7.GetHi())
+		v47 := v45.Xor(v67)
+
+		x0 := simd.Uint8x32{}.SetLo(v03)
+		x1 := simd.Uint8x32{}.SetLo(v47)
+		state = UpdateState128x2(state, x0, x1)
+
+	}
+
+	u := simd.LoadUint64x2(&[2]uint64{2, 8 * 32}).AsUint8x16()
+	t := simd.Uint8x32{}.SetLo(state.V2.GetLo().Xor(u))
+
+	for range 7 {
+		state = UpdateState128x2(state, t, t)
+	}
+
+	t01 := state.V0.GetLo().Xor(state.V1.GetLo())
+	t23 := state.V2.GetLo().Xor(state.V3.GetLo())
+	t45 := state.V4.GetLo().Xor(state.V5.GetLo())
+	t67 := state.V6.GetLo().Xor(state.V7.GetLo())
+
+	t03 := t01.Xor(t23)
+	t47 := t45.Xor(t67)
+
+	var ret [32]byte
+	t03.StoreSlice(ret[0:16])
+	t47.StoreSlice(ret[16:32])
+
+	return ret
+}
+
 func AESx2(M0 simd.Uint8x32, M1 simd.Uint8x32) simd.Uint8x32 {
 	// TODO: do this as a vector op.
 

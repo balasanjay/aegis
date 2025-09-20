@@ -180,7 +180,7 @@ func (a AEAD128x2) DetachedOpen32(dst, nonce, ciphertext, aad []byte, tag [32]by
 	return ret, nil
 }
 
-func (a AEAD128x2) Open(dst, nonce, ciphertext, aad[]byte) ([]byte, error) {
+func (a AEAD128x2) Open(dst, nonce, ciphertext, aad []byte) ([]byte, error) {
 	if len(ciphertext) < a.Overhead() {
 		return nil, errors.New("ciphertext too small")
 	}
@@ -189,6 +189,26 @@ func (a AEAD128x2) Open(dst, nonce, ciphertext, aad[]byte) ([]byte, error) {
 	ciphertext = ciphertext[:len(ciphertext)-a.Overhead()]
 
 	return a.DetachedOpen16(dst, nonce, ciphertext, aad, tag)
+}
+
+type Mac128x2 struct {
+	key [16]byte
+}
+
+func NewMac128x2(key [16]byte) Mac128x2 {
+	return Mac128x2{key}
+}
+
+func (m Mac128x2) Sum16(nonce []byte, data []byte) [16]byte {
+	state := impl.InitState128x2(simd.LoadUint8x16(&m.key), simd.LoadUint8x16Slice(nonce))
+	state = absorbAad(state, data)
+	return impl.Finalize128x2Mac_16(state, uint64(len(data)))
+}
+
+func (m Mac128x2) Sum32(nonce []byte, data []byte) [32]byte {
+	state := impl.InitState128x2(simd.LoadUint8x16(&m.key), simd.LoadUint8x16Slice(nonce))
+	state = absorbAad(state, data)
+	return impl.Finalize128x2Mac_32(state, uint64(len(data)))
 }
 
 func sliceForAppend(in []byte, n int) (head, tail []byte) {
