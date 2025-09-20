@@ -111,38 +111,49 @@ func DecPartial128x2(state State128x2, c [64]byte, clen int) (State128x2, [64]by
 	return state, plaintext
 }
 
-func Finalize128x2(state State128x2, adlen, msglen uint64, tagout []byte) {
-	{
-		t0 := simd.LoadUint64x2(&[2]uint64{8 * adlen, 8 * msglen}).AsUint8x16()
-		t1 := simd.Uint8x32{}.SetLo(t0).SetHi(t0).Xor(state.V2)
+func finalize128x2Common(state State128x2, adlen, msglen uint64) State128x2 {
+	t0 := simd.LoadUint64x2(&[2]uint64{8 * adlen, 8 * msglen}).AsUint8x16()
+	t1 := simd.Uint8x32{}.SetLo(t0).SetHi(t0).Xor(state.V2)
 
-		for range 7 {
-			state = UpdateState128x2(state, t1, t1)
-		}
+	for range 7 {
+		state = UpdateState128x2(state, t1, t1)
 	}
 
-	if len(tagout) == 16 {
-		v01 := state.V0.Xor(state.V1)
-		v23 := state.V2.Xor(state.V3)
-		v45 := state.V4.Xor(state.V5)
-		v03 := v01.Xor(v23)
-		v456 := v45.Xor(state.V6)
-		v06 := v03.Xor(v456)
-		v06.GetLo().Xor(v06.GetHi()).StoreSlice(tagout)
-	} else if len(tagout) == 32 {
-		v01 := state.V0.Xor(state.V1)
-		v23 := state.V2.Xor(state.V3)
-		v45 := state.V4.Xor(state.V5)
-		v67 := state.V6.Xor(state.V7)
+	return state
+}
 
-		v03 := v01.Xor(v23)
-		v03.GetLo().Xor(v03.GetHi()).StoreSlice(tagout[0:16])
+func Finalize128x2_16(state State128x2, adlen, msglen uint64) [16]byte {
+	state = finalize128x2Common(state, adlen, msglen)
 
-		v47 := v45.Xor(v67)
-		v47.GetLo().Xor(v47.GetHi()).StoreSlice(tagout[16:32])
-	} else {
-		panic("tagout must be 16 or 32 bytes")
-	}
+	v01 := state.V0.Xor(state.V1)
+	v23 := state.V2.Xor(state.V3)
+	v45 := state.V4.Xor(state.V5)
+	v03 := v01.Xor(v23)
+	v456 := v45.Xor(state.V6)
+	v06 := v03.Xor(v456)
+
+	var ret [16]byte
+	v06.GetLo().Xor(v06.GetHi()).Store(&ret)
+	return ret
+}
+
+func Finalize128x2_32(state State128x2, adlen, msglen uint64) [32]byte {
+	state = finalize128x2Common(state, adlen, msglen)
+
+	v01 := state.V0.Xor(state.V1)
+	v23 := state.V2.Xor(state.V3)
+	v45 := state.V4.Xor(state.V5)
+	v67 := state.V6.Xor(state.V7)
+
+	var ret [32]byte
+
+	v03 := v01.Xor(v23)
+	v03.GetLo().Xor(v03.GetHi()).StoreSlice(ret[0:16])
+
+	v47 := v45.Xor(v67)
+	v47.GetLo().Xor(v47.GetHi()).StoreSlice(ret[16:32])
+
+	return ret
 }
 
 func AESx2(M0 simd.Uint8x32, M1 simd.Uint8x32) simd.Uint8x32 {
