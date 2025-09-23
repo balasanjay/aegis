@@ -3,12 +3,13 @@ package aegis_test
 import (
 	"encoding/hex"
 	"testing"
+	"encoding/binary"
+	"bytes"
 
 	"github.com/balasanjay/aegis"
 )
 
-func TestAegis128x2(t *testing.T) {
-	tcs := []struct {
+var aegis128x2TestCases = []struct {
 		name string
 
 		// Inputs (all hex-encoded)
@@ -65,7 +66,9 @@ func TestAegis128x2(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tcs {
+
+func TestAegis128x2(t *testing.T) {
+	for _, tc := range aegis128x2TestCases {
 		t.Run(tc.name, func(t *testing.T) {
 			key := unhex(tc.key)
 			nonce := unhex(tc.nonce)
@@ -121,6 +124,56 @@ func TestAegis128x2(t *testing.T) {
 			}
 		})
 	}
+}
+
+
+func FuzzAegis128x2Roundtrip(f *testing.F) {
+	for _, tc := range aegis128x2TestCases {
+		key := ([16]byte)(unhex(tc.key))
+		key0 := binary.LittleEndian.Uint64(key[0:8])
+		key1 := binary.LittleEndian.Uint64(key[8:16])
+
+		nonce := ([16]byte)(unhex(tc.nonce))
+		nonce0 := binary.LittleEndian.Uint64(nonce[0:8])
+		nonce1 := binary.LittleEndian.Uint64(nonce[8:16])
+
+		plaintext := unhex(tc.plaintext)
+		additionalData := unhex(tc.additionalData)
+
+		f.Add(key0, key1, nonce0, nonce1, plaintext, additionalData)
+	}
+
+	ciphertext := []byte{}
+	rtPlaintext := []byte{}
+
+	f.Fuzz(func(t *testing.T, key0 uint64, key1 uint64, nonce0 uint64, nonce1 uint64, plaintext []byte, additionalData []byte) {
+		ciphertext = ciphertext[:0]
+		rtPlaintext = rtPlaintext[:0]
+
+		var key [16]byte
+		binary.LittleEndian.PutUint64(key[0:8], key0)
+		binary.LittleEndian.PutUint64(key[8:16], key1)
+
+		var nonce [16]byte
+		binary.LittleEndian.PutUint64(nonce[0:8], nonce0)
+		binary.LittleEndian.PutUint64(nonce[8:16], nonce1)
+
+		aead := aegis.NewAEAD128x2(key)
+
+		ciphertext = aead.Seal(ciphertext, nonce[:], plaintext, additionalData)
+
+		var err error
+		rtPlaintext, err = aead.Open(rtPlaintext, nonce[:], ciphertext, additionalData)
+		if err != nil {
+			t.Errorf("should have roundtripped successfully, but failed: %v", err)
+			return
+		}
+
+		if bytes.Compare(plaintext, rtPlaintext) != 0 {
+			t.Errorf("plaintext did not roundtrip successfully")
+			return
+		}
+	})
 }
 
 func TestAegisMac128x2(t *testing.T) {

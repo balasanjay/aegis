@@ -3,6 +3,7 @@ package aegis
 import (
 	"crypto/subtle"
 	"errors"
+	"slices"
 	"simd"
 
 	"github.com/balasanjay/aegis/internal/impl"
@@ -25,14 +26,14 @@ func (a AEAD128x2) Overhead() int {
 }
 
 func (a AEAD128x2) Seal(dst, nonce, plaintext, aad []byte) []byte {
-	ret, tag := sliceForAppend(dst, len(plaintext)+a.Overhead())
+	dst = slices.Grow(dst, len(plaintext)+a.Overhead())
 
 	var tagb [16]byte
-	ret, tagb = a.DetachedSeal16(ret, nonce, plaintext, aad)
+	dst, tagb = a.DetachedSeal16(dst, nonce, plaintext, aad)
 
-	copy(tag[:], tagb[:])
+	dst = append(dst, tagb[:]...)
 
-	return ret
+	return dst
 }
 
 func absorbAad(state impl.State128x2, aad []byte) impl.State128x2 {
@@ -121,10 +122,9 @@ func (a AEAD128x2) detachedOpen(dst, nonce, ciphertext, aad []byte) ([]byte, imp
 		panic("nonce is incorrect size")
 	}
 
-	ret, _ := sliceForAppend(dst, len(ciphertext))
-	if len(ret) < len(ciphertext) {
-		panic("expected len(ret) >= len(ciphertext)")
-	}
+	ret := slices.Grow(dst, len(ciphertext))
+	ret = ret[:len(ciphertext)]
+
 	// TODO: panic if ret and ciphertext have inexact overlap.
 	// TODO: panic if ret and aad have any overlap.
 
@@ -212,6 +212,7 @@ func (m Mac128x2) Sum32(nonce []byte, data []byte) [32]byte {
 }
 
 func sliceForAppend(in []byte, n int) (head, tail []byte) {
+
 	if total := len(in) + n; cap(in) >= total {
 		head = in[:total]
 	} else {
