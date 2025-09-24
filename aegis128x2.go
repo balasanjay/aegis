@@ -3,8 +3,8 @@ package aegis
 import (
 	"crypto/subtle"
 	"errors"
-	"slices"
 	"simd"
+	"slices"
 
 	"github.com/balasanjay/aegis/internal/impl"
 )

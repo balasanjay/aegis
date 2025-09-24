@@ -1,71 +1,71 @@
 package aegis_test
 
 import (
-	"encoding/hex"
-	"testing"
-	"encoding/binary"
 	"bytes"
+	"encoding/binary"
+	"encoding/hex"
+	"strconv"
+	"testing"
 
 	"github.com/balasanjay/aegis"
 )
 
 var aegis128x2TestCases = []struct {
-		name string
+	name string
 
-		// Inputs (all hex-encoded)
-		key            string
-		nonce          string
-		plaintext      string
-		additionalData string
+	// Inputs (all hex-encoded)
+	key            string
+	nonce          string
+	plaintext      string
+	additionalData string
 
-		// Expected outputs (all hex-encoded).
-		expectedCiphertext string
-		expectedTag16      string
-		expectedTag32      string
-	}{
-		{
-			name: "TestVector1",
+	// Expected outputs (all hex-encoded).
+	expectedCiphertext string
+	expectedTag16      string
+	expectedTag32      string
+}{
+	{
+		name: "TestVector1",
 
-			key:            "000102030405060708090a0b0c0d0e0f",
-			nonce:          "101112131415161718191a1b1c1d1e1f",
-			plaintext:      "",
-			additionalData: "",
+		key:            "000102030405060708090a0b0c0d0e0f",
+		nonce:          "101112131415161718191a1b1c1d1e1f",
+		plaintext:      "",
+		additionalData: "",
 
-			expectedCiphertext: "",
-			expectedTag16:      "63117dc57756e402819a82e13eca8379",
-			expectedTag32: "b92c71fdbd358b8a4de70b27631ace90" +
-				"cffd9b9cfba82028412bac41b4f53759",
-		},
+		expectedCiphertext: "",
+		expectedTag16:      "63117dc57756e402819a82e13eca8379",
+		expectedTag32: "b92c71fdbd358b8a4de70b27631ace90" +
+			"cffd9b9cfba82028412bac41b4f53759",
+	},
 
-		{
-			name: "TestVector2",
+	{
+		name: "TestVector2",
 
-			key:   "000102030405060708090a0b0c0d0e0f",
-			nonce: "101112131415161718191a1b1c1d1e1f",
-			plaintext: "04050607040506070405060704050607" +
-				"04050607040506070405060704050607" +
-				"04050607040506070405060704050607" +
-				"04050607040506070405060704050607" +
-				"04050607040506070405060704050607" +
-				"04050607040506070405060704050607" +
-				"04050607040506070405060704050607" +
-				"0405060704050607",
-			additionalData: "0102030401020304",
+		key:   "000102030405060708090a0b0c0d0e0f",
+		nonce: "101112131415161718191a1b1c1d1e1f",
+		plaintext: "04050607040506070405060704050607" +
+			"04050607040506070405060704050607" +
+			"04050607040506070405060704050607" +
+			"04050607040506070405060704050607" +
+			"04050607040506070405060704050607" +
+			"04050607040506070405060704050607" +
+			"04050607040506070405060704050607" +
+			"0405060704050607",
+		additionalData: "0102030401020304",
 
-			expectedCiphertext: "5795544301997f93621b278809d6331b" +
-				"3bfa6f18e90db12c4aa35965b5e98c5f" +
-				"c6fb4e54bcb6111842c20637252eff74" +
-				"7cb3a8f85b37de80919a589fe0f24872" +
-				"bc926360696739e05520647e390989e1" +
-				"eb5fd42f99678a0276a498f8c454761c" +
-				"9d6aacb647ad56be62b29c22cd4b5761" +
-				"b38f43d5a5ee062f",
-			expectedTag16: "1aebc200804f405cab637f2adebb6d77",
-			expectedTag32: "c471876f9b4978c44f2ae1ce770cdb11" +
-				"a094ee3feca64e7afcd48bfe52c60eca",
-		},
-	}
-
+		expectedCiphertext: "5795544301997f93621b278809d6331b" +
+			"3bfa6f18e90db12c4aa35965b5e98c5f" +
+			"c6fb4e54bcb6111842c20637252eff74" +
+			"7cb3a8f85b37de80919a589fe0f24872" +
+			"bc926360696739e05520647e390989e1" +
+			"eb5fd42f99678a0276a498f8c454761c" +
+			"9d6aacb647ad56be62b29c22cd4b5761" +
+			"b38f43d5a5ee062f",
+		expectedTag16: "1aebc200804f405cab637f2adebb6d77",
+		expectedTag32: "c471876f9b4978c44f2ae1ce770cdb11" +
+			"a094ee3feca64e7afcd48bfe52c60eca",
+	},
+}
 
 func TestAegis128x2(t *testing.T) {
 	for _, tc := range aegis128x2TestCases {
@@ -126,7 +126,6 @@ func TestAegis128x2(t *testing.T) {
 	}
 }
 
-
 func FuzzAegis128x2Roundtrip(f *testing.F) {
 	for _, tc := range aegis128x2TestCases {
 		key := ([16]byte)(unhex(tc.key))
@@ -174,6 +173,29 @@ func FuzzAegis128x2Roundtrip(f *testing.F) {
 			return
 		}
 	})
+}
+
+func benchmarkAegis128x2(b *testing.B, plaintext []byte) {
+	var key [16]byte
+	var nonce [16]byte
+	ciphertext := make([]byte, len(plaintext)+16)
+
+	b.SetBytes(int64(len(plaintext)))
+
+	aead := aegis.NewAEAD128x2(key)
+
+	for b.Loop() {
+		ciphertext = ciphertext[:0]
+		ciphertext = aead.Seal(ciphertext, nonce[:], plaintext, nil)
+	}
+}
+
+func BenchmarkAegis128x2(b *testing.B) {
+	for _, length := range []int{64, 16384, 65536} {
+		b.Run(strconv.Itoa(length), func(b *testing.B) {
+			benchmarkAegis128x2(b, make([]byte, length))
+		})
+	}
 }
 
 func TestAegisMac128x2(t *testing.T) {
@@ -229,6 +251,27 @@ func TestAegisMac128x2(t *testing.T) {
 					t.Errorf("got tag32=%q, want tag=%q", gotTag, tc.expectedTag32)
 				}
 			}
+		})
+	}
+}
+
+func benchmarkAegisMac128x2(b *testing.B, data []byte) {
+	var key [16]byte
+	var nonce [16]byte
+
+	b.SetBytes(int64(len(data)))
+
+	mac := aegis.NewMac128x2(key)
+
+	for b.Loop() {
+		_ = mac.Sum16(nonce[:], data)
+	}
+}
+
+func BenchmarkAegisMac128x2(b *testing.B) {
+	for _, length := range []int{64, 16384, 65536} {
+		b.Run(strconv.Itoa(length), func(b *testing.B) {
+			benchmarkAegisMac128x2(b, make([]byte, length))
 		})
 	}
 }
