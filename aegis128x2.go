@@ -61,10 +61,12 @@ func (a AEAD128x2) detachedSeal(dst, nonce, plaintext, aad []byte) ([]byte, impl
 		panic("nonce is incorrect size")
 	}
 
-	ret, _ := sliceForAppend(dst, len(plaintext))
+	ret := slices.Grow(dst, len(plaintext))
+	ret = ret[0:len(plaintext)]
 	if len(ret) < len(plaintext) {
 		panic("expected len(ret) >= len(plaintext)")
 	}
+
 	// TODO: panic if ret and plaintext have inexact overlap.
 	// TODO: panic if ret and aad have any overlap.
 
@@ -209,16 +211,4 @@ func (m Mac128x2) Sum32(nonce []byte, data []byte) [32]byte {
 	state := impl.InitState128x2(simd.LoadUint8x16(&m.key), simd.LoadUint8x16Slice(nonce))
 	state = absorbAad(state, data)
 	return impl.Finalize128x2Mac_32(state, uint64(len(data)))
-}
-
-func sliceForAppend(in []byte, n int) (head, tail []byte) {
-
-	if total := len(in) + n; cap(in) >= total {
-		head = in[:total]
-	} else {
-		head = make([]byte, total)
-		copy(head, in)
-	}
-	tail = head[len(in):]
-	return
 }
