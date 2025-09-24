@@ -52,14 +52,27 @@ func InitState128x2(key simd.Uint8x16, nonce simd.Uint8x16) State128x2 {
 }
 
 func UpdateState128x2(state State128x2, M0 simd.Uint8x32, M1 simd.Uint8x32) State128x2 {
-	V0 := AESx2(state.V7, state.V0.Xor(M0))
-	V1 := AESx2(state.V0, state.V1)
-	V2 := AESx2(state.V1, state.V2)
-	V3 := AESx2(state.V2, state.V3)
-	V4 := AESx2(state.V3, state.V4.Xor(M1))
-	V5 := AESx2(state.V4, state.V5)
-	V6 := AESx2(state.V5, state.V6)
-	V7 := AESx2(state.V6, state.V7)
+	V0 := state.V0
+	V1 := state.V1
+	V2 := state.V2
+	V3 := state.V3
+	V4 := state.V4
+	V5 := state.V5
+	V6 := state.V6
+	V7 := state.V7
+
+	Tmp := V7
+	V7 = AESx2(V6, V7)
+	V6 = AESx2(V5, V6)
+	V5 = AESx2(V4, V5)
+	V4 = AESx2(V3, V4)
+	V3 = AESx2(V2, V3)
+	V2 = AESx2(V1, V2)
+	V1 = AESx2(V0, V1)
+	V0 = AESx2(Tmp, V0)
+
+	V0 = V0.Xor(M0)
+	V4 = V4.Xor(M1)
 
 	return State128x2{V0, V1, V2, V3, V4, V5, V6, V7}
 }
