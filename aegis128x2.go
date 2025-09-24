@@ -38,10 +38,43 @@ func (a AEAD128x2) Seal(dst, nonce, plaintext, aad []byte) []byte {
 
 func absorbAad(state impl.State128x2, aad []byte) impl.State128x2 {
 	var i int
-	for i = 0; i+64 <= len(aad); i += 64 {
-		m0 := simd.LoadUint8x32Slice(aad[i : i+32])
-		m1 := simd.LoadUint8x32Slice(aad[i+32 : i+64])
-		state = impl.UpdateState128x2(state, m0, m1)
+
+	{
+		V0 := state.V0
+		V1 := state.V1
+		V2 := state.V2
+		V3 := state.V3
+		V4 := state.V4
+		V5 := state.V5
+		V6 := state.V6
+		V7 := state.V7
+
+		for i = 0; i+64 <= len(aad); i += 64 {
+			m0 := simd.LoadUint8x32Slice(aad[i : i+32])
+			m1 := simd.LoadUint8x32Slice(aad[i+32 : i+64])
+
+			Tmp := V7
+			V7 = AESx2(V6, V7)
+			V6 = AESx2(V5, V6)
+			V5 = AESx2(V4, V5)
+			V4 = AESx2(V3, V4)
+			V3 = AESx2(V2, V3)
+			V2 = AESx2(V1, V2)
+			V1 = AESx2(V0, V1)
+			V0 = AESx2(Tmp, V0)
+
+			V0 = V0.Xor(m0)
+			V4 = V4.Xor(m1)
+		}
+
+		state.V0 = V0
+		state.V1 = V1
+		state.V2 = V2
+		state.V3 = V3
+		state.V4 = V4
+		state.V5 = V5
+		state.V6 = V6
+		state.V7 = V7
 	}
 
 	if i < len(aad) {
@@ -76,15 +109,53 @@ func (a AEAD128x2) detachedSeal(dst, nonce, plaintext, aad []byte) ([]byte, impl
 	// Encrypt blocks.
 	{
 		var i int
-		for i = 0; i+64 <= len(plaintext); i += 64 {
-			p0 := simd.LoadUint8x32Slice(plaintext[i : i+32])
-			p1 := simd.LoadUint8x32Slice(plaintext[i+32 : i+64])
 
-			var c0, c1 simd.Uint8x32
-			state, c0, c1 = impl.Enc128x2(state, p0, p1)
+		{
+			V0 := state.V0
+			V1 := state.V1
+			V2 := state.V2
+			V3 := state.V3
+			V4 := state.V4
+			V5 := state.V5
+			V6 := state.V6
+			V7 := state.V7
 
-			c0.StoreSlice(ret[i : i+32])
-			c1.StoreSlice(ret[i+32 : i+64])
+			for i = 0; i+64 <= len(plaintext); i += 64 {
+				p0 := simd.LoadUint8x32Slice(plaintext[i : i+32])
+				p1 := simd.LoadUint8x32Slice(plaintext[i+32 : i+64])
+
+				Z0 := V6.Xor(V1).Xor(V2.And(V3))
+				Z1 := V2.Xor(V5).Xor(V6.And(V7))
+
+				Tmp := V7
+				V7 = AESx2(V6, V7)
+				V6 = AESx2(V5, V6)
+				V5 = AESx2(V4, V5)
+				V4 = AESx2(V3, V4)
+				V3 = AESx2(V2, V3)
+				V2 = AESx2(V1, V2)
+				V1 = AESx2(V0, V1)
+				V0 = AESx2(Tmp, V0)
+
+				V0 = V0.Xor(p0)
+				V4 = V4.Xor(p1)
+
+				c0 := p0.Xor(Z0)
+				c1 := p1.Xor(Z1)
+
+				c0.StoreSlice(ret[i : i+32])
+				c1.StoreSlice(ret[i+32 : i+64])
+			}
+
+			state.V0 = V0
+			state.V1 = V1
+			state.V2 = V2
+			state.V3 = V3
+			state.V4 = V4
+			state.V5 = V5
+			state.V6 = V6
+			state.V7 = V7
+
 		}
 
 		if i < len(plaintext) {
@@ -211,4 +282,8 @@ func (m Mac128x2) Sum32(nonce []byte, data []byte) [32]byte {
 	state := impl.InitState128x2(simd.LoadUint8x16(&m.key), simd.LoadUint8x16Slice(nonce))
 	state = absorbAad(state, data)
 	return impl.Finalize128x2Mac_32(state, uint64(len(data)))
+}
+
+func AESx2(M0 simd.Uint8x32, M1 simd.Uint8x32) simd.Uint8x32 {
+	return M0.AESEncryptRound(M1.AsUint32x8())
 }
