@@ -232,15 +232,5 @@ func Finalize128x2Mac_32(state State128x2, dlen uint64) [32]byte {
 }
 
 func AESx2(M0 simd.Uint8x32, M1 simd.Uint8x32) simd.Uint8x32 {
-	// TODO: do this as a vector op.
-
-	m00 := M0.GetLo()
-	m10 := M1.GetLo()
-	result0 := AesRoundGeneric(m00, m10)
-
-	m01 := M0.GetHi()
-	m11 := M1.GetHi()
-	result1 := AesRoundGeneric(m01, m11)
-
-	return simd.Uint8x32{}.SetLo(result0).SetHi(result1)
+	return M0.AESEncryptRound(M1.AsUint32x8())
 }
