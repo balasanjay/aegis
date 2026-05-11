@@ -1,16 +1,16 @@
 package impl
 
 import (
-	"simd"
+	"simd/archsimd"
 )
 
 type State128x2 struct {
-	V0, V1, V2, V3, V4, V5, V6, V7 simd.Uint8x32
+	V0, V1, V2, V3, V4, V5, V6, V7 archsimd.Uint8x32
 }
 
-func InitState128x2(key simd.Uint8x16, nonce simd.Uint8x16) State128x2 {
-	C0 := simd.LoadUint8x16(&[16]byte{0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x08, 0x0d, 0x15, 0x22, 0x37, 0x59, 0x90, 0xe9, 0x79, 0x62})
-	C1 := simd.LoadUint8x16(&[16]byte{0xdb, 0x3d, 0x18, 0x55, 0x6d, 0xc2, 0x2f, 0xf1, 0x20, 0x11, 0x31, 0x42, 0x73, 0xb5, 0x28, 0xdd})
+func InitState128x2(key archsimd.Uint8x16, nonce archsimd.Uint8x16) State128x2 {
+	C0 := archsimd.LoadUint8x16(&[16]byte{0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x08, 0x0d, 0x15, 0x22, 0x37, 0x59, 0x90, 0xe9, 0x79, 0x62})
+	C1 := archsimd.LoadUint8x16(&[16]byte{0xdb, 0x3d, 0x18, 0x55, 0x6d, 0xc2, 0x2f, 0xf1, 0x20, 0x11, 0x31, 0x42, 0x73, 0xb5, 0x28, 0xdd})
 
 	S0 := key.Xor(nonce)
 	S1 := C1
@@ -27,20 +27,20 @@ func InitState128x2(key simd.Uint8x16, nonce simd.Uint8x16) State128x2 {
 		16: 0x01,
 		17: 0x01,
 	}
-	Ctx := simd.LoadUint8x32(&ctx)
+	Ctx := archsimd.LoadUint8x32(&ctx)
 
 	var state State128x2
-	state.V0 = simd.Uint8x32{}.SetLo(S0).SetHi(S0)
-	state.V1 = simd.Uint8x32{}.SetLo(S1).SetHi(S1)
-	state.V2 = simd.Uint8x32{}.SetLo(S2).SetHi(S2)
-	state.V3 = simd.Uint8x32{}.SetLo(S3).SetHi(S3)
-	state.V4 = simd.Uint8x32{}.SetLo(S4).SetHi(S4)
-	state.V5 = simd.Uint8x32{}.SetLo(S5).SetHi(S5)
-	state.V6 = simd.Uint8x32{}.SetLo(S6).SetHi(S6)
-	state.V7 = simd.Uint8x32{}.SetLo(S7).SetHi(S7)
+	state.V0 = archsimd.Uint8x32{}.SetLo(S0).SetHi(S0)
+	state.V1 = archsimd.Uint8x32{}.SetLo(S1).SetHi(S1)
+	state.V2 = archsimd.Uint8x32{}.SetLo(S2).SetHi(S2)
+	state.V3 = archsimd.Uint8x32{}.SetLo(S3).SetHi(S3)
+	state.V4 = archsimd.Uint8x32{}.SetLo(S4).SetHi(S4)
+	state.V5 = archsimd.Uint8x32{}.SetLo(S5).SetHi(S5)
+	state.V6 = archsimd.Uint8x32{}.SetLo(S6).SetHi(S6)
+	state.V7 = archsimd.Uint8x32{}.SetLo(S7).SetHi(S7)
 
-	Key := simd.Uint8x32{}.SetLo(key).SetHi(key)
-	Nonce := simd.Uint8x32{}.SetLo(nonce).SetHi(nonce)
+	Key := archsimd.Uint8x32{}.SetLo(key).SetHi(key)
+	Nonce := archsimd.Uint8x32{}.SetLo(nonce).SetHi(nonce)
 
 	for range 10 {
 		state.V3 = state.V3.Xor(Ctx)
@@ -51,7 +51,7 @@ func InitState128x2(key simd.Uint8x16, nonce simd.Uint8x16) State128x2 {
 	return state
 }
 
-func UpdateState128x2(state State128x2, M0 simd.Uint8x32, M1 simd.Uint8x32) State128x2 {
+func UpdateState128x2(state State128x2, M0 archsimd.Uint8x32, M1 archsimd.Uint8x32) State128x2 {
 	V0 := state.V0
 	V1 := state.V1
 	V2 := state.V2
@@ -77,7 +77,7 @@ func UpdateState128x2(state State128x2, M0 simd.Uint8x32, M1 simd.Uint8x32) Stat
 	return State128x2{V0, V1, V2, V3, V4, V5, V6, V7}
 }
 
-func Enc128x2(state State128x2, P0 simd.Uint8x32, P1 simd.Uint8x32) (State128x2, simd.Uint8x32, simd.Uint8x32) {
+func Enc128x2(state State128x2, P0 archsimd.Uint8x32, P1 archsimd.Uint8x32) (State128x2, archsimd.Uint8x32, archsimd.Uint8x32) {
 	Z0 := state.V6.Xor(state.V1).Xor(state.V2.And(state.V3))
 	Z1 := state.V2.Xor(state.V5).Xor(state.V6.And(state.V7))
 
@@ -88,7 +88,7 @@ func Enc128x2(state State128x2, P0 simd.Uint8x32, P1 simd.Uint8x32) (State128x2,
 	return state, C0, C1
 }
 
-func Dec128x2(state State128x2, C0 simd.Uint8x32, C1 simd.Uint8x32) (State128x2, simd.Uint8x32, simd.Uint8x32) {
+func Dec128x2(state State128x2, C0 archsimd.Uint8x32, C1 archsimd.Uint8x32) (State128x2, archsimd.Uint8x32, archsimd.Uint8x32) {
 	Z0 := state.V6.Xor(state.V1).Xor(state.V2.And(state.V3))
 	Z1 := state.V2.Xor(state.V5).Xor(state.V6.And(state.V7))
 
@@ -106,8 +106,8 @@ func DecPartial128x2(state State128x2, c [64]byte, clen int) (State128x2, [64]by
 	Z0 := state.V6.Xor(state.V1).Xor(state.V2.And(state.V3))
 	Z1 := state.V2.Xor(state.V5).Xor(state.V6.And(state.V7))
 
-	C0 := simd.LoadUint8x32Slice(c[0:32])
-	C1 := simd.LoadUint8x32Slice(c[32:64])
+	C0 := archsimd.LoadUint8x32Slice(c[0:32])
+	C1 := archsimd.LoadUint8x32Slice(c[32:64])
 
 	P0 := C0.Xor(Z0)
 	P1 := C1.Xor(Z1)
@@ -118,15 +118,15 @@ func DecPartial128x2(state State128x2, c [64]byte, clen int) (State128x2, [64]by
 	P1.StoreSlice(plaintext[32:64])
 	clear(plaintext[clen:])
 
-	P0 = simd.LoadUint8x32Slice(plaintext[0:32])
-	P1 = simd.LoadUint8x32Slice(plaintext[32:64])
+	P0 = archsimd.LoadUint8x32Slice(plaintext[0:32])
+	P1 = archsimd.LoadUint8x32Slice(plaintext[32:64])
 	state = UpdateState128x2(state, P0, P1)
 	return state, plaintext
 }
 
 func finalize128x2Common(state State128x2, adlen, msglen uint64) State128x2 {
-	t0 := simd.LoadUint64x2(&[2]uint64{8 * adlen, 8 * msglen}).AsUint8x16()
-	t1 := simd.Uint8x32{}.SetLo(t0).SetHi(t0).Xor(state.V2)
+	t0 := archsimd.LoadUint64x2(&[2]uint64{8 * adlen, 8 * msglen}).AsUint8x16()
+	t1 := archsimd.Uint8x32{}.SetLo(t0).SetHi(t0).Xor(state.V2)
 
 	for range 7 {
 		state = UpdateState128x2(state, t1, t1)
@@ -179,12 +179,12 @@ func Finalize128x2Mac_16(state State128x2, dlen uint64) [16]byte {
 	v456 := v45.Xor(state.V6)
 	v06 := v03.Xor(v456)
 
-	x0 := simd.Uint8x32{}.SetLo(v06.GetLo())
-	x1 := simd.Uint8x32{}.SetLo(v06.GetHi())
+	x0 := archsimd.Uint8x32{}.SetLo(v06.GetLo())
+	x1 := archsimd.Uint8x32{}.SetLo(v06.GetHi())
 	state = UpdateState128x2(state, x0, x1)
 
-	u := simd.LoadUint64x2(&[2]uint64{2, 8 * 16}).AsUint8x16()
-	t := simd.Uint8x32{}.SetLo(state.V2.GetLo().Xor(u))
+	u := archsimd.LoadUint64x2(&[2]uint64{2, 8 * 16}).AsUint8x16()
+	t := archsimd.Uint8x32{}.SetLo(state.V2.GetLo().Xor(u))
 
 	for range 7 {
 		state = UpdateState128x2(state, t, t)
@@ -216,14 +216,14 @@ func Finalize128x2Mac_32(state State128x2, dlen uint64) [32]byte {
 		v67 := state.V6.GetHi().Xor(state.V7.GetHi())
 		v47 := v45.Xor(v67)
 
-		x0 := simd.Uint8x32{}.SetLo(v03)
-		x1 := simd.Uint8x32{}.SetLo(v47)
+		x0 := archsimd.Uint8x32{}.SetLo(v03)
+		x1 := archsimd.Uint8x32{}.SetLo(v47)
 		state = UpdateState128x2(state, x0, x1)
 
 	}
 
-	u := simd.LoadUint64x2(&[2]uint64{2, 8 * 32}).AsUint8x16()
-	t := simd.Uint8x32{}.SetLo(state.V2.GetLo().Xor(u))
+	u := archsimd.LoadUint64x2(&[2]uint64{2, 8 * 32}).AsUint8x16()
+	t := archsimd.Uint8x32{}.SetLo(state.V2.GetLo().Xor(u))
 
 	for range 7 {
 		state = UpdateState128x2(state, t, t)
@@ -244,6 +244,6 @@ func Finalize128x2Mac_32(state State128x2, dlen uint64) [32]byte {
 	return ret
 }
 
-func AESx2(M0 simd.Uint8x32, M1 simd.Uint8x32) simd.Uint8x32 {
-	return M0.AESEncryptRound(M1.AsUint32x8())
+func AESx2(M0 archsimd.Uint8x32, M1 archsimd.Uint8x32) archsimd.Uint8x32 {
+	return M0.AESEncryptOneRound(M1.AsUint32x8())
 }

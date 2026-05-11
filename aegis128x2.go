@@ -3,7 +3,7 @@ package aegis
 import (
 	"crypto/subtle"
 	"errors"
-	"simd"
+	"simd/archsimd"
 	"slices"
 
 	"github.com/balasanjay/aegis/internal/impl"
@@ -39,8 +39,8 @@ func (a AEAD128x2) Seal(dst, nonce, plaintext, aad []byte) []byte {
 func absorbAad(state impl.State128x2, aad []byte) impl.State128x2 {
 	var i int
 	for i = 0; i+64 <= len(aad); i += 64 {
-		m0 := simd.LoadUint8x32Slice(aad[i : i+32])
-		m1 := simd.LoadUint8x32Slice(aad[i+32 : i+64])
+		m0 := archsimd.LoadUint8x32Slice(aad[i : i+32])
+		m1 := archsimd.LoadUint8x32Slice(aad[i+32 : i+64])
 		state = impl.UpdateState128x2(state, m0, m1)
 	}
 
@@ -48,8 +48,8 @@ func absorbAad(state impl.State128x2, aad []byte) impl.State128x2 {
 		var last [64]byte
 		copy(last[:], aad[i:])
 
-		m0 := simd.LoadUint8x32Slice(last[0:32])
-		m1 := simd.LoadUint8x32Slice(last[32:64])
+		m0 := archsimd.LoadUint8x32Slice(last[0:32])
+		m1 := archsimd.LoadUint8x32Slice(last[32:64])
 		state = impl.UpdateState128x2(state, m0, m1)
 	}
 
@@ -70,17 +70,17 @@ func (a AEAD128x2) detachedSeal(dst, nonce, plaintext, aad []byte) ([]byte, impl
 	// TODO: panic if ret and plaintext have inexact overlap.
 	// TODO: panic if ret and aad have any overlap.
 
-	state := impl.InitState128x2(simd.LoadUint8x16(&a.key), simd.LoadUint8x16Slice(nonce))
+	state := impl.InitState128x2(archsimd.LoadUint8x16(&a.key), archsimd.LoadUint8x16Slice(nonce))
 	state = absorbAad(state, aad)
 
 	// Encrypt blocks.
 	{
 		var i int
 		for i = 0; i+64 <= len(plaintext); i += 64 {
-			p0 := simd.LoadUint8x32Slice(plaintext[i : i+32])
-			p1 := simd.LoadUint8x32Slice(plaintext[i+32 : i+64])
+			p0 := archsimd.LoadUint8x32Slice(plaintext[i : i+32])
+			p1 := archsimd.LoadUint8x32Slice(plaintext[i+32 : i+64])
 
-			var c0, c1 simd.Uint8x32
+			var c0, c1 archsimd.Uint8x32
 			state, c0, c1 = impl.Enc128x2(state, p0, p1)
 
 			c0.StoreSlice(ret[i : i+32])
@@ -91,10 +91,10 @@ func (a AEAD128x2) detachedSeal(dst, nonce, plaintext, aad []byte) ([]byte, impl
 			var last [64]byte
 			copy(last[:], plaintext[i:])
 
-			p0 := simd.LoadUint8x32Slice(last[0:32])
-			p1 := simd.LoadUint8x32Slice(last[32:64])
+			p0 := archsimd.LoadUint8x32Slice(last[0:32])
+			p1 := archsimd.LoadUint8x32Slice(last[32:64])
 
-			var c0, c1 simd.Uint8x32
+			var c0, c1 archsimd.Uint8x32
 			state, c0, c1 = impl.Enc128x2(state, p0, p1)
 
 			c0.StoreSlice(last[0:32])
@@ -130,17 +130,17 @@ func (a AEAD128x2) detachedOpen(dst, nonce, ciphertext, aad []byte) ([]byte, imp
 	// TODO: panic if ret and ciphertext have inexact overlap.
 	// TODO: panic if ret and aad have any overlap.
 
-	state := impl.InitState128x2(simd.LoadUint8x16(&a.key), simd.LoadUint8x16Slice(nonce))
+	state := impl.InitState128x2(archsimd.LoadUint8x16(&a.key), archsimd.LoadUint8x16Slice(nonce))
 	state = absorbAad(state, aad)
 
 	// Decrypt blocks.
 	{
 		var i int
 		for i = 0; i+64 <= len(ciphertext); i += 64 {
-			c0 := simd.LoadUint8x32Slice(ciphertext[i : i+32])
-			c1 := simd.LoadUint8x32Slice(ciphertext[i+32 : i+64])
+			c0 := archsimd.LoadUint8x32Slice(ciphertext[i : i+32])
+			c1 := archsimd.LoadUint8x32Slice(ciphertext[i+32 : i+64])
 
-			var p0, p1 simd.Uint8x32
+			var p0, p1 archsimd.Uint8x32
 			state, p0, p1 = impl.Dec128x2(state, c0, c1)
 
 			p0.StoreSlice(ret[i : i+32])
@@ -202,13 +202,13 @@ func NewMac128x2(key [16]byte) Mac128x2 {
 }
 
 func (m Mac128x2) Sum16(nonce []byte, data []byte) [16]byte {
-	state := impl.InitState128x2(simd.LoadUint8x16(&m.key), simd.LoadUint8x16Slice(nonce))
+	state := impl.InitState128x2(archsimd.LoadUint8x16(&m.key), archsimd.LoadUint8x16Slice(nonce))
 	state = absorbAad(state, data)
 	return impl.Finalize128x2Mac_16(state, uint64(len(data)))
 }
 
 func (m Mac128x2) Sum32(nonce []byte, data []byte) [32]byte {
-	state := impl.InitState128x2(simd.LoadUint8x16(&m.key), simd.LoadUint8x16Slice(nonce))
+	state := impl.InitState128x2(archsimd.LoadUint8x16(&m.key), archsimd.LoadUint8x16Slice(nonce))
 	state = absorbAad(state, data)
 	return impl.Finalize128x2Mac_32(state, uint64(len(data)))
 }
