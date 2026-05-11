@@ -3,7 +3,7 @@ package impl_test
 import (
 	"encoding/hex"
 	"fmt"
-	"simd"
+	"simd/archsimd"
 	"strings"
 	"testing"
 
@@ -14,10 +14,10 @@ func TestAegis128x2(t *testing.T) {
 	key := unhex("000102030405060708090a0b0c0d0e0f")
 	nonce := unhex("101112131415161718191a1b1c1d1e1f")
 
-	state := impl.InitState128x2(simd.LoadUint8x16Slice(key), simd.LoadUint8x16Slice(nonce))
+	state := impl.InitState128x2(archsimd.LoadUint8x16Slice(key), archsimd.LoadUint8x16Slice(nonce))
 
 	var output strings.Builder
-	appendV := func(i int, V simd.Uint8x32) {
+	appendV := func(i int, V archsimd.Uint8x32) {
 		fmt.Fprintf(&output, "V[%d,0]: %s\n", i, hexSIMD(V.GetLo()))
 		fmt.Fprintf(&output, "V[%d,1]: %s\n\n", i, hexSIMD(V.GetHi()))
 	}
@@ -74,7 +74,7 @@ func unhex(h string) []byte {
 	return b
 }
 
-func hexSIMD(a simd.Uint8x16) string {
+func hexSIMD(a archsimd.Uint8x16) string {
 	var b [16]byte
 	a.StoreSlice(b[:])
 	return hex.EncodeToString(b[:])
